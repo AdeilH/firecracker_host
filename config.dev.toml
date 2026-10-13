@@ -1,0 +1,21 @@
+# Local development config: run the daemon on this dev machine for testing.
+#   sudo ./bin/microvmsd -config config.dev.toml
+listen = "0.0.0.0:8420"
+external_ip = ""            # autodetect
+data_dir = "/tmp/microvms-dev"
+bridge = "fcbr0"
+host_cidr = "172.16.100.1/24"
+ip_start = "172.16.100.10"
+ip_end = "172.16.100.254"
+ssh_port_base = 2200
+api_tokens = ["dev-token-change-me"]
+default_vcpus = 1
+default_mem_mib = 256
+max_vcpus = 4
+max_mem_mib = 2048
+max_vms = 5
+firecracker_bin = "/home/Adeel/bin/firecracker"
+kernel_path = "images/vmlinux"
+rootfs_path = "images/rootfs.ext4"
+graceful_shutdown_timeout_sec = 10
+dev_unprivileged = true

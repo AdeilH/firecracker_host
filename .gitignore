@@ -1,0 +1,27 @@
+# build output
+bin/
+
+# VM assets (large: ~39MB kernel, ~512MB rootfs; rebuilt via `make assets`)
+images/vmlinux
+images/rootfs.ext4
+
+# local dev daemon state, logs, guest ssh keys
+dev-data/
+*.log
+*.key
+
+# go test artifacts
+*.test
+coverage.out
+
+# editor / OS cruft
+.idea/
+.vscode/
+*.swp
+.DS_Store
+
+# zcode video2code plugin marker
+.v2c/
+
+# zcode workspace state
+.zcode/

@@ -1,0 +1,6 @@
+# microvms guest sshd - key-only root login, fast for automation
+PermitRootLogin prohibit-password
+PasswordAuthentication no
+KbdInteractiveAuthentication no
+UseDNS no
+Subsystem sftp internal-sftp

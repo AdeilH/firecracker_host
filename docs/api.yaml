@@ -1,0 +1,83 @@
+openapi: 3.0.3
+info:
+  title: microvms API
+  version: "1.0"
+  description: |
+    Control Firecracker microVMs on this host. All /v1/vms* endpoints require
+    `Authorization: Bearer <token>`. VMs are disposable Alpine Linux sandboxes;
+    SSH into them with the returned key on the returned port.
+servers:
+  - url: http://{host}:8420
+    variables:
+      host: {default: localhost}
+paths:
+  /v1/health:
+    get:
+      summary: Liveness check (no auth)
+      responses: {"200": {description: ok}}
+  /v1/capacity:
+    get:
+      summary: Headroom for more VMs (auth)
+      responses: {"200": {description: capacity object}}
+  /v1/vms:
+    post:
+      summary: Create and boot a new microVM
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:    {type: string, description: "optional label"}
+                cpus:    {type: integer, default: 1}
+                mem_mib: {type: integer, default: 256}
+                ssh_key: {type: string, description: "public key to authorize; if omitted a keypair is generated and the private key returned"}
+      responses:
+        "201":
+          description: created
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/VM"}
+        "401": {description: bad token}
+        "409": {description: over capacity / bad params}
+    get:
+      summary: List VMs
+      responses: {"200": {description: "{vms: [VM]}}"}
+  /v1/vms/{id}:
+    get:
+      summary: VM status
+      parameters: [{name: id, in: path, required: true, schema: {type: string}}]
+      responses: {"200": {description: one VM}, "404": {description: not found}}
+    delete:
+      summary: Stop and delete the VM, its disk and resources
+      parameters: [{name: id, in: path, required: true, schema: {type: string}}]
+      responses: {"204": {description: deleted}}
+  /v1/vms/{id}/stop:
+    post:
+      summary: Graceful shutdown; disk kept so it can be restarted
+      parameters: [{name: id, in: path, required: true, schema: {type: string}}]
+      responses: {"200": {description: stopped}}
+  /v1/vms/{id}/start:
+    post:
+      summary: Boot a stopped VM from its existing disk
+      parameters: [{name: id, in: path, required: true, schema: {type: string}}]
+      responses: {"200": {description: started}}
+components:
+  securitySchemes:
+    bearer: {type: http, scheme: bearer}
+  schemas:
+    VM:
+      type: object
+      properties:
+        id: {type: string}
+        name: {type: string}
+        state: {type: string, enum: [creating, running, stopped, error]}
+        ip: {type: string, description: "VM address on the internal bridge"}
+        ssh_port: {type: integer, description: "host port forwarded to VM:22 - ssh to host:ssh_port"}
+        ssh_user: {type: string, example: root}
+        ssh_command: {type: string}
+        ssh_private_key: {type: string, description: "OpenSSH PEM private key, present only when the server generated the keypair"}
+        vcpus: {type: integer}
+        mem_mib: {type: integer}
+        created_at: {type: string, format: date-time}

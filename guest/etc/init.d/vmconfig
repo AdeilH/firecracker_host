@@ -1,0 +1,62 @@
+#!/sbin/openrc-run
+# vmconfig - microvms guest instance configuration.
+# Reads the raw config disk (/dev/vdb, written by microvmsd) and applies
+# networking + the SSH key before sshd starts.
+
+description="Apply microvms instance configuration"
+
+depend() {
+    after devfs dmesg sysfs hwdrivers
+    before sshd hostname
+}
+
+start() {
+    ebegin "Reading microvms instance config"
+
+    if [ ! -b /dev/vdb ]; then
+        mdev -s 2>/dev/null
+    fi
+    dd if=/dev/vdb of=/run/vmconfig bs=4096 count=1 2>/dev/null || true
+
+    # parse KEY=VALUE lines from the raw config disk
+    local IP PREFIX GW DNS HOSTNAME SSH_KEY
+    while IFS='=' read -r key value; do
+        case "$key" in
+            MICROVMS_IP)       IP="$value" ;;
+            MICROVMS_PREFIX)   PREFIX="$value" ;;
+            MICROVMS_GW)       GW="$value" ;;
+            MICROVMS_DNS)      DNS="$value" ;;
+            MICROVMS_HOSTNAME) HOSTNAME="$value" ;;
+            MICROVMS_SSH_KEY)  SSH_KEY="$value" ;;
+        esac
+    done < /run/vmconfig
+
+    if [ -z "$IP" ]; then
+        eend 1 "config disk empty or unreadable; VM will have no network"
+        return 1
+    fi
+
+    ip addr add "${IP}/${PREFIX}" dev eth0
+    ip link set eth0 up
+    ip route add default via "$GW"
+
+    # resolv.conf
+    : > /etc/resolv.conf
+    for ns in ${DNS//,/ }; do echo "nameserver $ns" >> /etc/resolv.conf; done
+
+    # hostname
+    if [ -n "$HOSTNAME" ]; then
+        echo "$HOSTNAME" > /etc/hostname
+        hostname "$HOSTNAME"
+    fi
+
+    # SSH key (first line only, in case of padding bleed)
+    if [ -n "$SSH_KEY" ]; then
+        mkdir -p /root/.ssh
+        echo "$SSH_KEY" > /root/.ssh/authorized_keys
+        chmod 700 /root/.ssh
+        chmod 600 /root/.ssh/authorized_keys
+    fi
+
+    eend 0 "configured eth0 ${IP}/${PREFIX} gw ${GW}"
+}

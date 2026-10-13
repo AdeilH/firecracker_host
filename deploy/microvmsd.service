@@ -1,0 +1,18 @@
+[Unit]
+Description=microvms Firecracker microVM control daemon
+Documentation=https://github.com/firecracker-microvm/firecracker
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/microvmsd -config /etc/microvms/config.toml
+Restart=on-failure
+RestartSec=2
+LimitNOFILE=1048576
+# firecracker + KVM
+DeviceAllow=/dev/kvm rw
+DeviceAllow=/dev/net/tun rw
+
+[Install]
+WantedBy=multi-user.target
