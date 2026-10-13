@@ -253,7 +253,7 @@ func configDisk(cfg *config.Config, rec store.VMRecord, pubKey string) []byte {
 
 // releaseNetwork removes a VM's tap and DNAT rules (idempotent).
 func (m *Manager) releaseNetwork(rec store.VMRecord) {
-	m.net.RemovePortDNAT(rec.SSHPort, rec.IP, rec.ID)
+	m.net.RemovePortDNAT(rec.ID)
 	m.net.DeleteTap(netplan.TapName(rec.ID))
 }
 

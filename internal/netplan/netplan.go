@@ -169,22 +169,27 @@ func (m *Manager) PortDNAT(port int, vmIP, vmID string) error {
 	return nil
 }
 
-// RemovePortDNAT removes every rule tagged for this VM. It deletes by exact
-// spec repeatedly until none match, covering both chains and FORWARD rules.
-func (m *Manager) RemovePortDNAT(port int, vmIP, vmID string) {
-	tag := "microvms:" + vmID
-	specs := [][]string{
-		{"-t", "nat", "-D", "PREROUTING", "-d", m.ExternalIP, "-p", "tcp", "--dport", fmt.Sprint(port), "-m", "comment", "--comment", tag, "-j", "DNAT", "--to-destination", vmIP + ":22"},
-		{"-t", "nat", "-D", "OUTPUT", "-d", m.ExternalIP, "-p", "tcp", "--dport", fmt.Sprint(port), "-m", "comment", "--comment", tag, "-j", "DNAT", "--to-destination", vmIP + ":22"},
-		{"-D", "FORWARD", "-d", vmIP, "-p", "tcp", "--dport", "22", "-m", "comment", "--comment", tag, "-j", "ACCEPT"},
-		{"-D", "FORWARD", "-s", vmIP, "-p", "tcp", "--sport", "22", "-m", "comment", "--comment", tag, "-j", "ACCEPT"},
-	}
-	for _, spec := range specs {
-		// a spec may have been installed more than once across daemon restarts
-		for i := 0; i < 4; i++ {
-			if exec.Command("iptables", spec...).Run() != nil {
-				break
+// RemovePortDNAT removes every rule tagged for this VM by enumerating
+// `iptables -S` and deleting matches. Matching by comment tag instead of a
+// reconstructed spec keeps cleanup working when the host's external IP
+// changed between create and delete (e.g. a roaming laptop).
+func (m *Manager) RemovePortDNAT(vmID string) {
+	for _, c := range []struct{ table, chain string }{
+		{"nat", "PREROUTING"},
+		{"nat", "OUTPUT"},
+		{"filter", "FORWARD"},
+	} {
+		out, err := exec.Command("iptables", "-t", c.table, "-S", c.chain).Output()
+		if err != nil {
+			continue
+		}
+		for _, line := range strings.Split(string(out), "\n") {
+			if !strings.Contains(line, "microvms:"+vmID+"\"") {
+				continue
 			}
+			spec := strings.TrimSpace(strings.TrimPrefix(line, "-A "+c.chain+" "))
+			spec = strings.ReplaceAll(spec, `"`, "")
+			_ = run("iptables", append([]string{"-t", c.table, "-D", c.chain}, strings.Fields(spec)...)...)
 		}
 	}
 }

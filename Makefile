@@ -1,5 +1,5 @@
 # microvms Makefile
-HOST ?= 192.168.0.118
+HOST ?= 192.168.100.7
 USER ?= $(shell whoami)
 TARGET ?= $(USER)@$(HOST)
 
